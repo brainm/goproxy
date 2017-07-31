@@ -57,9 +57,26 @@ func (proxy *ProxyHttpServer) dial(network, addr string) (c net.Conn, err error)
 	return net.Dial(network, addr)
 }
 
+func (proxy *ProxyHttpServer) dialContext(ctx *ProxyCtx, network, addr string) (c net.Conn, err error) {
+        if proxy.Tr.DialContext != nil {
+                return proxy.Tr.DialContext(ctx.Req.Context(), network, addr)
+        }
+	if proxy.Tr.Dial != nil {
+                return proxy.Tr.Dial(network, addr)
+        }
+        return net.Dial(network, addr)
+}
+
 func (proxy *ProxyHttpServer) connectDial(network, addr string) (c net.Conn, err error) {
 	if proxy.ConnectDial == nil {
 		return proxy.dial(network, addr)
+	}
+	return proxy.ConnectDial(network, addr)
+}
+
+func (proxy *ProxyHttpServer) connectDialContext(ctx *ProxyCtx, network, addr string) (c net.Conn, err error) {
+	if proxy.ConnectDial == nil {
+		return proxy.dialContext(ctx, network, addr)
 	}
 	return proxy.ConnectDial(network, addr)
 }
@@ -94,7 +111,7 @@ func (proxy *ProxyHttpServer) handleHttps(w http.ResponseWriter, r *http.Request
 		if !hasPort.MatchString(host) {
 			host += ":80"
 		}
-		targetSiteCon, err := proxy.connectDial("tcp", host)
+		targetSiteCon, err := proxy.connectDialContext(ctx, "tcp", host)
 		if err != nil {
 			httpError(proxyClient, ctx, err)
 			return
